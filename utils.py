@@ -79,7 +79,7 @@ class StemTokenizer:
         return [self.porter.stem(t) for t in tokens]
     
 class Tokenizer:
-    '''class for tokenizing text data'''
+    '''class for tokenizing text data using nltk.word_tokenize()'''
     def __init__(self, min_length=2, lemmatize=True, stop_words=get_stopwords(), remove_digits=True):
         self.min_length = min_length
         self.lemmatize = lemmatize
