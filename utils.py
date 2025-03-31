@@ -14,22 +14,23 @@ from wordcloud import WordCloud
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 
 
-def read_abstract_data(set1_path, set2_path, delim="\t", text_labels = ["pest", "contr"]):
+def read_abstract_data(negatives_path, positives_path, delim="\t", labels = [0, 1], text_labels = ["control", "pesticide"]):
     '''reads and concatenates the two files with abstracts and adds labels'''
-    set1 = pd.read_csv(set1_path, sep=delim)
-    set2 = pd.read_csv(set2_path, sep=delim)
-    print(set1.shape)
-    print(set2.shape)
-    set1['label'] = 1 # pesticides are the positive class
-    set2['label'] = 0
+    set1 = pd.read_csv(negatives_path, sep=delim)
+    set2 = pd.read_csv(positives_path, sep=delim)
+
+    set1['label'] = labels[0]
+    set2['label'] = labels[1]
+
     set1['text_label'] = text_labels[0]
     set2['text_label'] = text_labels[1]
-    #print(set2.head())
-    #concatenate and reset Index
+
+    #concatenate
     data = pd.concat([set1, set2], axis=0)
+    #reset Index
+    data = data.dropna()                # the order of these two steps matter!
     data = data.reset_index(drop=True)
 
-    data = data.dropna()
     return data
 
 def preprocess_text(data, keep_original=True, remove_punct=False, lower_case=True):
@@ -168,8 +169,8 @@ def evaluate_model(model, x_train, y_train, x_test, y_test, verbose = True):
     results['confusion_matrix'] = cnf_matrix
 
     if verbose:
-        print("test accuracy: ", round(test_accuracy, num_digits))
         print("train accuracy:", round(train_accuracy, num_digits))
+        print("test accuracy: ", round(test_accuracy, num_digits))
         print("test precision:", round(test_precision, num_digits))
         print("test recall:   ", round(test_recall, num_digits))
         print("test F1 score: ", round(test_f1, num_digits))
@@ -278,9 +279,8 @@ def recommend(pmid, df, paper2idx, X, top_n_papers = 5):
     '''
     # will skip the first (self hit)
     top_n_papers += 1
-    # get the row in the dataframe for this movie
     idx = paper2idx[pmid]
-    if type(idx) == pd.Series: # when there are multiple mvies with the same title
+    if type(idx) == pd.Series: # when there are multiple with the same pmid
         idx = idx.iloc[0]
     
     # calculate the pairwise similarities for this movie
