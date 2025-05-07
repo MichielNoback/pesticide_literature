@@ -6,7 +6,7 @@ def init(api_key, email):
     Entrez.email = email
 
 
-def query_pubmed_by_date(date=None, retmax=5000):
+def query_pubmed_by_date(date=None, retmax=10000):
     """
     Fetches Pubmed papers by date.
     :param date: Date in YYYY/MM/DD format. Defaults to yesterday.
