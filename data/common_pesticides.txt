@@ -1,0 +1,66 @@
+Acetochlor
+alachlor
+aldicarb
+aldrin
+amitraz
+atrazine
+benomyl
+benzalkonium chloride (BC)
+bifenthrin (a pyrethroid)
+carbaryl
+carbendazim
+carbofos
+carbofuran
+captan
+chlordane
+chlordecone (Kepone)
+chlordimeform
+chlormequat (chlorcholine chloride) 
+chlorothalonil
+chlorpyrifos
+Cyfloxylate
+cyfluthrin
+cypermethrin (alpha-cypermethrin)
+deltamethrin
+demeton
+dichlorovos
+dieldrin
+diethofencarb
+dimetoat
+diquat
+Endosulfan
+EPN
+Fenitrothion
+fenobucarb
+Fenthion
+fenvalarate
+fipronil
+flucythrinate
+glufosinate
+glyphosate
+Imidacloprid
+lambda-cyhalothrin
+Lindane
+Malathion
+methiocarb
+methoxychlor
+metolachlor
+metribuzin
+Molinate-Thiobencarb 
+monocrotophos
+oxamyl
+parathion
+Pentachlorophenol
+permethrin (a pyrethroid)
+profenofos
+propanil
+propoxur
+Pyrethroid (verzamelnaam)
+sulprofos
+Temephos
+tetrahydrophthalimide (metabolite of captan)
+Trichlorfon / trichlorofon
+trifluralin
+vinclozolin
+
+Organochlorine pesticides

@@ -33,27 +33,32 @@ def read_abstract_data(negatives_path, positives_path, delim="\t", labels = [0, 
 
     return data
 
-def preprocess_text(data, keep_original=True, remove_punct=False, lower_case=True):
+#def preprocess_text(data, keep_original=True, remove_punct=False, lower_case=True):
+def preprocess_text(data, keep_original=True, remove_punct=False, lower_case=True, remove_digits=False):
     '''preprocesses the text data'''
-    if remove_punct :
-        #remove punctuation
+    if remove_punct:
         punct = '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{}~'   # `|` is not present here
-        transtab = str.maketrans(dict.fromkeys(punct, ''))
-        if keep_original:            
-            data['abstract_clean'] = data['abstract'].str.translate(transtab)
-            data['title_clean'] = data['title'].str.translate(transtab)
-        else:
-            data['abstract'] = data['abstract'].str.translate(transtab)
-            data['title'] = data['title'].str.translate(transtab)
+        transtab = str.maketrans(dict.fromkeys(punct, ' '))
+        data['title_clean'] = data['title'].str.translate(transtab)
+        data['abstract_clean'] = data['abstract'].str.translate(transtab)
     if lower_case:
-        ## lowercasing
-        if keep_original:            
+        if 'title_clean' in data.columns:
+            data['title_clean'] = data['title_clean'].str.lower()
+            data['abstract_clean'] = data['abstract_clean'].str.lower()
+        else:
             data['title_clean'] = data['title'].str.lower()
             data['abstract_clean'] = data['abstract'].str.lower()
+    if remove_digits:
+        if 'title_clean' in data.columns:
+            data['title_clean'] = data['title_clean'].str.replace(r'\d+', '', regex=True)
+            data['abstract_clean'] = data['abstract_clean'].str.replace(r'\d+', '', regex=True)
         else:
-            data['title'] = data['title'].str.lower()
-            data['abstract'] = data['abstract'].str.lower()
-    #return None
+            data['title_clean'] = data['title'].str.replace(r'\d+', '', regex=True)
+            data['abstract_clean'] = data['abstract'].str.replace(r'\d+', '', regex=True)
+    # collapse spaces
+    data['title_clean'] = data['title_clean'].str.replace(r'\s+', ' ', regex=True)
+    data['abstract_clean'] = data['abstract_clean'].str.replace(r'\s+', ' ', regex=True)
+
 
 def get_stopwords(extended=True, add_scientific_units=True, custom=None):
     '''constructs a set of stopwords and returns this as a list'''
