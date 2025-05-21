@@ -8,6 +8,7 @@ import pandas as pd
 
 import tensorflow as tf
 import scripts.utils as utils
+import scripts.pesticides as pesticides
 
 # global settings
 global_vars = {}
@@ -16,6 +17,7 @@ global_vars['config'] = None
 global_vars['model'] = None
 global_vars['pesticide_papers'] = None
 global_vars['new_papers'] = None
+global_vars['pesticide_terms'] = pesticides.pesticide_classes.extend(pesticides.pesticide_names)
 
 def check_command_line(argv):
     if len(sys.argv) != 2:
@@ -112,37 +114,33 @@ def load_new_papers():
         print(f"... Shape of new papers dataframe: {new_papers.shape}")
         print(f"... Column names: {new_papers.columns.tolist()}")
 
-def classify_new_papers():
+def mark_new_papers_with_pesticide_terms():
     """
-    Classify the new papers using the model.
+    Mark the new papers with pesticide terms.
     """
     new_papers = global_vars['new_papers']
-    model = global_vars['model']
-
-    # Assuming the model expects a specific input format
-    # For example, if the model expects a list of texts
-    texts = new_papers['text'].tolist()
-    
-    # Make predictions
-    predictions = model.predict(texts)
-    
-    # Assuming the model outputs probabilities for each class
-    predicted_classes = tf.argmax(predictions, axis=1).numpy()
-    
-    # Add predictions to the dataframe
-    new_papers['predicted_class'] = predicted_classes
-    
-    print("New papers classified successfully.")
+    #print(pesticides.pesticide_terms)
+    new_pesticide_papers = utils.find_pesticide_terms(new_papers, pesticides.pesticide_terms)
+    # store in global_vars
+    global_vars['new_pesticide_papers'] = new_pesticide_papers
+    print("New papers with pesticide terms marked.")
     if global_vars['verbose']:
-        print(f"... Predictions: {predicted_classes}")
+        print(f"... Number of new pesticide papers: {len(new_pesticide_papers)}")
+        #print(f"... Column names: {new_pesticide_papers.columns.tolist()}")
+        print(new_pesticide_papers)
+
+
+    #raise RuntimeError("This function is not implemented yet.")
+
 
 def main():
     check_command_line(sys.argv)
     read_config(sys.argv[1])
     # load_model()
-    load_pesticide_papers()
-    # load_new_papers()
-    # classify_new_papers()
+    #load_pesticide_papers()
+    load_new_papers()
+    mark_new_papers_with_pesticide_terms()
+    
 
 
 if __name__ == "__main__":

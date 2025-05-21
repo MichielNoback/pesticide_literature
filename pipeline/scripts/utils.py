@@ -90,8 +90,29 @@ def find_pesticide_terms(df:pd.DataFrame,
         pd.DataFrame: A DataFrame containing rows where the specified column contains any of the terms.
     """
     terms = [term.lower() for term in terms]
-    return df[df['title'].str.contains('|'.join(terms), na=False) | 
-              df['abstract'].str.contains('|'.join(terms), na=False)]
+    #print(f'Finding terms: {terms}')
+    # Check if the columns exist in the DataFrame
+    if 'title_clean' not in df.columns or 'abstract_clean' not in df.columns:
+        raise ValueError("DataFrame must contain 'title' and 'abstract' columns.")
+    # Filter the DataFrame based on the presence of terms in either the title or abstract
+    # also lower the title and abstract columns
+    matches = df[df['title_clean'].str.contains('|'.join(terms), na=False) | 
+              df['abstract_clean'].str.contains('|'.join(terms), na=False)]
+    # create a new dataframe with the pmid and the title and the found terms
+    found_terms = pd.DataFrame()
+    found_terms['pmid'] = matches['pmid']
+    found_terms['title'] = matches['title']
+    #found_terms['abstract'] = matches['abstract']
+    found_terms['found_terms_title'] = matches['title_clean'].str.findall('|'.join(terms))
+    found_terms['found_terms_abstract'] = matches['abstract_clean'].str.findall('|'.join(terms))
+    # only keep unique values in the new columns
+    found_terms['found_terms_title'] = found_terms['found_terms_title'].apply(lambda x: list(set(x)))
+    found_terms['found_terms_abstract'] = found_terms['found_terms_abstract'].apply(lambda x: list(set(x)))
+    found_terms['found_terms'] = found_terms['found_terms_title'] + found_terms['found_terms_abstract']
+    # delete found_terms_title and found_terms_abstract
+    found_terms = found_terms.drop(columns=['found_terms_title', 'found_terms_abstract'])
+    return found_terms
+
 
 
 # def get_stopwords(extended=True, add_scientific_units=True, custom=None):
