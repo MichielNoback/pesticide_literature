@@ -3,23 +3,30 @@
 import os
 import sys
 from configparser import ConfigParser
+from typing import List
 
-import pandas as pd
+import pandas as pd # type: ignore
+from sklearn.feature_extraction.text import  TfidfVectorizer # type: ignore
 
-import tensorflow as tf
+import tensorflow as tf # type: ignore
 import scripts.utils as utils
 import scripts.pesticides as pesticides
 
-# global settings
+# global variables
+config = None
 global_vars = {}
 global_vars['verbose'] = False
 global_vars['config'] = None
 global_vars['model'] = None
 global_vars['pesticide_papers'] = None
 global_vars['new_papers'] = None
-global_vars['pesticide_terms'] = pesticides.pesticide_classes.extend(pesticides.pesticide_names)
+global_vars['vectorizer'] = None
 
-def check_command_line(argv):
+
+def check_command_line(argv: List[str]) -> None:
+    """
+    Check the command line arguments.
+    """
     if len(sys.argv) != 2:
         print("Usage: python main.py <config_file>")
         sys.exit(1)
@@ -29,7 +36,7 @@ def check_command_line(argv):
         sys.exit(1)
 
 
-def read_config(config_file):
+def read_config(config_file: str) -> None:
     """
     Read the config file and store as global variable.
     Also performs some checks on required options
@@ -53,7 +60,8 @@ def read_config(config_file):
         print("Config file is not valid. Exiting.")
         sys.exit(1)
 
-def load_model():
+
+def load_model() -> None:
     """
     Load the model from the config file.
     """
@@ -73,7 +81,7 @@ def load_model():
         model.summary()
 
 
-def load_pesticide_papers():
+def load_pesticide_papers() -> None:
     """
     Load the pesticide papers from the config file.
     """
@@ -95,7 +103,34 @@ def load_pesticide_papers():
         print(f"... Shape of pesticide papers dataframe: {pesticide_papers.shape}")
         print(f"... Column names: {pesticide_papers.columns.tolist()}")
 
-def load_new_papers():
+
+def make_vectorizer() -> TfidfVectorizer:
+    """
+    Make the vectorizer for the pesticide papers.
+    """
+    vectorizer = utils.make_vectorizer()
+    global_vars['vectorizer'] = vectorizer
+    print("Vectorizer created successfully.")
+    if global_vars['verbose']:
+        print(f"... Vectorizer: {vectorizer}") 
+
+
+def make_embeddings(papers: pd.DataFrame, 
+                    storage_key: str,
+                    only_transform: bool) -> None: 
+    """
+    Make embeddings for the pesticide papers.
+    """
+    embeddings = utils.make_embeddings(global_vars['vectorizer'], papers, only_transform=only_transform)
+    global_vars[storage_key] = embeddings
+    
+    print("Embeddings created successfully.")
+    if global_vars['verbose']:
+        print(f"... Embeddings type: {type(embeddings)}")
+        print(f"... Shape of TF-IDF embeddings: {embeddings.shape}")
+
+
+def load_new_papers() -> None:
     """
     Load the new papers from the config file.
     """
@@ -114,7 +149,8 @@ def load_new_papers():
         print(f"... Shape of new papers dataframe: {new_papers.shape}")
         print(f"... Column names: {new_papers.columns.tolist()}")
 
-def mark_new_papers_with_pesticide_terms():
+
+def mark_new_papers_with_pesticide_terms() -> None:
     """
     Mark the new papers with pesticide terms.
     """
@@ -126,21 +162,75 @@ def mark_new_papers_with_pesticide_terms():
     print("New papers with pesticide terms marked.")
     if global_vars['verbose']:
         print(f"... Number of new pesticide papers: {len(new_pesticide_papers)}")
-        #print(f"... Column names: {new_pesticide_papers.columns.tolist()}")
+        print(f"... Column names: {new_pesticide_papers.columns.tolist()}")
         print(new_pesticide_papers)
 
 
-    #raise RuntimeError("This function is not implemented yet.")
+def find_nearest_neighbors() -> None:
+    """
+    Find the nearest neighbors of the new papers.
+    """
+    pesticide_papers = global_vars['pesticide_papers']
+    new_pesticide_papers = global_vars['new_pesticide_papers']
+    pesticide_paper_embeddings = global_vars['pesticide_papers_embeddings']
+    new_pesticide_paper_embeddings = global_vars['new_pesticide_papers_embeddings']
+    new_pesticide_papers = utils.find_nearest_neighbors(pesticide_papers, 
+                                                        new_pesticide_papers, 
+                                                        pesticide_paper_embeddings, 
+                                                        new_pesticide_paper_embeddings)
+    print("Nearest neighbors found.")
+    if global_vars['verbose']:
+        print(f"... Column names: {new_pesticide_papers.columns.tolist()}")
+        print(new_pesticide_papers[['pmid', 'title', 'found_terms']])
+        # print(new_pesticide_papers[['pmid', 'title', 'nearest_neighbors']])
+
+    # # load the model
+    # model = global_vars['model']
+    # # find the nearest neighbors
+    # utils.find_nearest_neighbors(new_pesticide_papers, model)
+    # print("Nearest neighbors found.")
+    # if global_vars['verbose']:
+    #     print(f"... Number of nearest neighbors: {len(new_pesticide_papers)}")
+    #     #print(f"... Column names: {new_pesticide_papers.columns.tolist()}")
+    #     print(new_pesticide_papers)
 
 
-def main():
+def perform_keyword_extraction():
+    """
+    Perform keyword extraction on the new papers.
+    """
+    new_pesticide_papers = global_vars['new_pesticide_papers']
+    utils.perform_keyword_extraction(new_pesticide_papers)
+    raise RuntimeError("This function is not implemented yet.")
+
+
+def main() -> None:
+    """
+    Main function to run the pipeline.
+    """
+    ## INITIALIZE
     check_command_line(sys.argv)
     read_config(sys.argv[1])
     # load_model()
-    #load_pesticide_papers()
+    make_vectorizer()
+
+    ## LOAD DATA
+    load_pesticide_papers()
     load_new_papers()
+
+    ## FIND CANDIDATE PESTICIDE PAPERS
     mark_new_papers_with_pesticide_terms()
-    
+
+    ## CREATE EMBEDDINGS
+    make_embeddings(global_vars['pesticide_papers'], 'pesticide_papers_embeddings', only_transform=False)
+    #global_vars['pesticide_papers_embeddings'] = pesticide_papers_embeddings
+    make_embeddings(global_vars['new_pesticide_papers'], 'new_pesticide_papers_embeddings', only_transform=True)
+    #global_vars['new_pesticide_paper_embeddings'] = new_pesticide_paper_embeddings
+
+    ## FIND NEAREST NEIGHBORS
+    find_nearest_neighbors()
+
+    #perform_keyword_extraction()
 
 
 if __name__ == "__main__":

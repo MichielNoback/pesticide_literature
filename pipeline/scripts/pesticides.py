@@ -10,7 +10,8 @@ def _create_pesticide_classes():
     global pesticide_classes
     # Define the pesticide classes
     pesticide_classes = ['pesticide', 'acaricide', 'algicide', 'avicide', 'bactericide', 'fungicide',
-                         'herbicide', 'insecticide', 'molluscicide', 'nematicide', 'rodenticide', 'virucide']
+                         'herbicide', 'insecticide', 'molluscicide', 'nematicide', 'rodenticide', 'virucide',
+                         'miticide']
     
     # Create a list of pesticide classes with "al" suffix
     pesticide_classes2 = [(p[:-1] + "al") for p in pesticide_classes]

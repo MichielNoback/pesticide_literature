@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 # from sklearn import metrics
 # import seaborn as sn
@@ -5,14 +6,17 @@ import pandas as pd
 import textwrap
 from typing import List
 
-# import nltk
-# from nltk.stem import WordNetLemmatizer, PorterStemmer
-# from nltk.corpus import stopwords
-# # scientific units
-# from quantities import units
-# from wordcloud import WordCloud
-
+from sklearn.feature_extraction.text import  TfidfVectorizer # type: ignore
 # from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
+
+import nltk
+from typing import Protocol
+from nltk.stem import WordNetLemmatizer # type: ignore
+from nltk.corpus import stopwords # type: ignore
+
+# scientific units
+from quantities import units # type: ignore
+# from wordcloud import WordCloud
 
 def preprocess_text(data: pd.DataFrame, 
                     remove_punctuation: bool = False, 
@@ -98,39 +102,103 @@ def find_pesticide_terms(df:pd.DataFrame,
     # also lower the title and abstract columns
     matches = df[df['title_clean'].str.contains('|'.join(terms), na=False) | 
               df['abstract_clean'].str.contains('|'.join(terms), na=False)]
+    
     # create a new dataframe with the pmid and the title and the found terms
     found_terms = pd.DataFrame()
-    found_terms['pmid'] = matches['pmid']
-    found_terms['title'] = matches['title']
-    #found_terms['abstract'] = matches['abstract']
+    # make a selection of the df dataframe based on the pmid column of the matches dataframe
+    found_terms = df[df['pmid'].isin(matches['pmid'])].copy()
+
+    # # copy original data from bigger dataframe
+    # found_terms['pmid'] = matches['pmid']
+    # found_terms['title'] = matches['title']
+    # found_terms['abstract'] = matches['abstract']
+    # found_terms['title_clean'] = matches['title_clean']
+    # found_terms['abstract_clean'] = matches['abstract_clean']
+
     found_terms['found_terms_title'] = matches['title_clean'].str.findall('|'.join(terms))
     found_terms['found_terms_abstract'] = matches['abstract_clean'].str.findall('|'.join(terms))
+
     # only keep unique values in the new columns
     found_terms['found_terms_title'] = found_terms['found_terms_title'].apply(lambda x: list(set(x)))
     found_terms['found_terms_abstract'] = found_terms['found_terms_abstract'].apply(lambda x: list(set(x)))
     found_terms['found_terms'] = found_terms['found_terms_title'] + found_terms['found_terms_abstract']
+
     # delete found_terms_title and found_terms_abstract
     found_terms = found_terms.drop(columns=['found_terms_title', 'found_terms_abstract'])
     return found_terms
 
 
+class SupportsVectorizer(Protocol):
+    def fit(self, raw_documents, y=None): ...
+    def transform(self, raw_documents): ...
+    def fit_transform(self, raw_documents, y=None): ...
 
-# def get_stopwords(extended=True, add_scientific_units=True, custom=None):
-#     '''constructs a set of stopwords and returns this as a list'''
-#     stops = set(stopwords.words('english'))
-#     if extended:
-#         stops = stops.union({
-#             'said', 'would', 'could', 'told', 'also', 'one', 'two',
-#             'mr', 'new', 'year', 'used'
-#         })
-#     if add_scientific_units:
-#         unit_symbols = [u.symbol for _, u in units.__dict__.items() if isinstance(u, type(units.deg))]
-#         ## add scientific units to stopwords
-#         stops = stops.union(unit_symbols)
-#     if custom:
-#         stops = stops.union(custom)
-#     stops = list(stops)
-#     return stops
+def make_vectorizer(vocabulary_size: int = 2000, type="TF-IDF") -> SupportsVectorizer:
+    '''Creates an (TF-IDF) vectorizer. Calls the get_stopwords() function to get the stopwords and 
+    uses the custom Tokenizer class of this package for tokenization.
+
+    Arguments:
+        vocabulary_size = size of the vocabulary (default = 2500)
+    Returns:
+        Vectorizer instance (only TfidfVectorizer for now)
+    '''
+    if not type == "TF-IDF":
+        raise ValueError(f"Unknown vectorizer type: {type}. Currently, only TF-IDF is supported.")
+    stopwords = get_stopwords()
+    tokenizer = Tokenizer(stop_words=stopwords, min_length=3)
+    vectorizer = TfidfVectorizer(
+        tokenizer=tokenizer,
+        max_features=vocabulary_size,
+    )
+    return vectorizer
+
+
+def make_embeddings(vectorizer: SupportsVectorizer,
+                           papers: pd.DataFrame, 
+                           column: str = 'abstract_clean',
+                           only_transform: bool = False):
+    '''Creates (TF-IDF) embeddings for the papers.
+    Arguments:
+        vectorizer = (TF-IDF) vectorizer, or any object that supports the SupportsVectorizer protocol.
+        papers = DataFrame with the papers
+        column = column to use for the embeddings (default = 'abstract_clean')
+        only_transform = whether to only transform() the data, or call fit_transform() (default = False)
+    '''
+    if column not in papers.columns:
+        raise ValueError(f"Column {column} not found in DataFrame.")
+    if only_transform:
+        # transform the data
+        X = vectorizer.transform(papers[column])
+    else:
+        # fit and transform the data
+        X = vectorizer.fit_transform(papers[column])
+    return X
+
+
+def get_stopwords(extended: bool = True, 
+                  add_scientific_units: bool = True, 
+                  custom: List[str] = None):
+    '''Constructs a set of stopwords, based on nltk English stopwords (stopwords.words('english')) and returns this as a list
+    Arguments:
+        extended = whether to use extended stopwords (default = True). 
+                    The extended set includes 'said', 'would', 'could', 'told', 'also', 'one', 'two', 'three', 'study', 'result', 'method',
+                    'used', 'using', 'wa', 'use', 'sup', '/sup', 'sub', '/sub'
+        add_scientific_units = whether to add scientific units (default = True)
+                    these units come from the quantities package
+        custom = list of custom stopwords to be added (default = None)
+    '''
+    stops = set(stopwords.words('english'))
+    if extended:
+        stops = stops.union({
+            'said', 'would', 'could', 'told', 'also', 'one', 'two', 'three', 'study', 'result', 'method',
+            'used', 'using', 'wa', 'use', 'sup', '/sup', 'sub', '/sub'})
+    if add_scientific_units:
+        unit_symbols = [u.symbol for _, u in units.__dict__.items() if isinstance(u, type(units.deg))]
+        stops = stops.union(unit_symbols)
+    if custom:
+        stops = stops.union(custom)
+    stops = list(stops)
+    return stops
 
 # class StemTokenizer:
 #     def __init__(self):
@@ -139,38 +207,79 @@ def find_pesticide_terms(df:pd.DataFrame,
 #         tokens = word_tokenize(doc)
 #         return [self.porter.stem(t) for t in tokens]
     
-# class Tokenizer:
-#     '''class for tokenizing text data using nltk.word_tokenize()'''
-#     def __init__(self, min_length=2, lemmatize=True, stop_words=get_stopwords(), remove_digits=True):
-#         self.min_length = min_length
-#         self.lemmatize = lemmatize
-#         self.stop_words = stop_words
-#         self.remove_digits = remove_digits
+class Tokenizer:
+    '''class for tokenizing text data using nltk.word_tokenize()'''
+    def __init__(self, min_length=2, lemmatize=True, stop_words=get_stopwords(), remove_digits=True):
+        self.min_length = min_length
+        self.lemmatize = lemmatize
+        self.stop_words = stop_words
+        self.remove_digits = remove_digits
 
-#     def __call__(self, s):
-#         return self.tokenize_text(s)
+    def __call__(self, s):
+        return self.tokenize_text(s)
     
-#     def tokenize_text(self, s):
-#         '''tokenizes the text data'''
-#         # split string into words (tokens)
-#         tokens = nltk.tokenize.word_tokenize(s)
+    def __str__(self):
+        return f'Tokenizer(min_length={self.min_length}, lemmatize={self.lemmatize}, # stop_words={len(self.stop_words)}, remove_digits={self.remove_digits})'
+    def __repr__(self):
+        return f'Tokenizer(min_length={self.min_length}, lemmatize={self.lemmatize}, # stop_words={len(self.stop_words)}, remove_digits={self.remove_digits})'
+        
+    def tokenize_text(self, s):
+        '''tokenizes the text data'''
+        # split string into words (tokens)
+        tokens = nltk.tokenize.word_tokenize(s)
 
-#         # remove short words, they're probably not useful
-#         tokens = [t for t in tokens if len(t) >= self.min_length]
+        # remove short words, they're probably not useful
+        tokens = [t for t in tokens if len(t) >= self.min_length]
 
-#         if self.lemmatize:
-#             lemmatizer = WordNetLemmatizer()
-#             # put words into base form
-#             tokens = [lemmatizer.lemmatize(t) for t in tokens]
+        if self.lemmatize:
+            lemmatizer = WordNetLemmatizer()
+            # put words into base form
+            tokens = [lemmatizer.lemmatize(t) for t in tokens]
 
-#         if self.stop_words:
-#             # remove stopwords
-#             tokens = [t for t in tokens if t not in self.stop_words]
-#         if self.remove_digits:
-#             # remove any digits, i.e. "3rd edition"
-#             tokens = [t for t in tokens if not any(c.isdigit() for c in t)]
+        if self.stop_words:
+            # remove stopwords
+            tokens = [t for t in tokens if t not in self.stop_words]
+        if self.remove_digits:
+            # remove any digits, i.e. "3rd edition"
+            tokens = [t for t in tokens if not any(c.isdigit() for c in t)]
 
-#         return tokens
+        return tokens
+
+#new_pesticide_papers = utils.find_nearest_neighbors(pesticide_papers, new_pesticide_papers, pesticide_paper_embeddings, new_pesticide_paper_embeddings)
+def find_nearest_neighbors(reference_papers: pd.DataFrame, 
+                            query_papers: pd.DataFrame, 
+                            reference_papers_embeddings: np.ndarray, 
+                            query_papers_embeddings: np.ndarray, 
+                            top_n_papers: int = 5) -> pd.DataFrame:
+    '''Finds the nearest neighbors of the new papers based on the cosine similarity of the TF-IDF matrix.
+    Arguments:
+        reference_papers = DataFrame with the reference papers
+        query_papers = DataFrame with the query papers
+        reference_papers_embeddings = TF-IDF sparse matrix with the reference papers
+        query_papers_embeddings = TF-IDF sparse matrix with the query papers
+        top_n_papers = number of recommendations to return (default = 5)
+    Returns:
+        DataFrame with the top_n_papers recommendations for each query paper
+    '''
+    # generate a mapping from paper pubmed id -> index (in df)
+    pmid2df_index = pd.Series(reference_papers.index, index=reference_papers['pmid'])
+    print(f"Paper2idx mapping: {pmid2df_index}")
+    return query_papers
+
+    # # calculate the pairwise similarities for this movie
+    # scores = cosine_similarity(new_paper_embeddings, paper_embeddings)
+    
+    # # get the indexes of the highest scoring movies
+    # # get the first K recommendations
+    # # don't return itself!
+    # top_scoring_idx = (-scores).argsort(axis=1)[:, 1:top_n_papers+1]
+    # top_scoring_scores = scores[np.arange(scores.shape[0])[:, None], top_scoring_idx]
+
+    # best_matches_pmids = papers['pmid'].iloc[top_scoring_idx] # fetches a Series
+    # best_matches_titles = papers['title'].iloc[top_scoring_idx]    
+    # best_matches = pd.concat([best_matches_pmids, best_matches_titles], axis=1)
+    # best_matches['score'] = top_scoring_scores
+    # return best_matches
 
 
 # def plot_top_words(model, feature_names, n_components=10, n_top_words=10):
